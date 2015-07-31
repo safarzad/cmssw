@@ -11,7 +11,8 @@ SUSY_HLT_DiJet_MET = cms.EDAnalyzer("SUSY_HLT_DiJet_MET",
   #TriggerResults = cms.InputTag('TriggerResults','','HLT'),
   HLTProcess = cms.string('HLT'),
   #HLTProcess = cms.string('HLT'),
-  TriggerPath = cms.string('HLT_DiCentralPFJet70_PFMET120_NoiseCleaned_v'),
+  #TriggerPath = cms.string('HLT_DiCentralPFJet70_PFMET120_NoiseCleaned_v'),
+  TriggerPath = cms.string('HLT_DiCentralPFJet70_PFMET120_JetIdCleaned_v'),
   TriggerPathAuxiliaryForHadronic = cms.string('HLT_IsoMu24_eta2p1_IterTrk02_v'),
   TriggerFilter = cms.InputTag('hltPFMET120Filter', '', 'HLT'), #the last filter in the path
   TriggerJetFilter = cms.InputTag('hltDiCentralPFJet70', '', 'HLT'), #the last filter in the path
@@ -23,7 +24,8 @@ SUSY_HLT_DiJet_MET = cms.EDAnalyzer("SUSY_HLT_DiJet_MET",
 )
 
 SUSY_HLT_DiJet_MET_POSTPROCESSING = cms.EDAnalyzer("DQMGenericClient",
-    subDirs        = cms.untracked.vstring("HLT/SUSYBSM/HLT_DiCentralPFJet70_PFMET120_NoiseCleaned"),
+    #subDirs        = cms.untracked.vstring("HLT/SUSYBSM/HLT_DiCentralPFJet70_PFMET120_NoiseCleaned"),
+    subDirs        = cms.untracked.vstring("HLT/SUSYBSM/HLT_DiCentralPFJet70_PFMET120_JetIdCleaned"),
     verbose        = cms.untracked.uint32(2), # Set to 2 for all messages
     resolution     = cms.vstring(""),
     efficiency     = cms.vstring(
