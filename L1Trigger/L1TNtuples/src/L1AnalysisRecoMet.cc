@@ -47,7 +47,8 @@ void L1Analysis::L1AnalysisRecoMet::SetHtMht(const edm::Handle<reco::CaloJetColl
   recoMet_.mHtPhi= tv2->Phi();
 
 }
-
+/*
+ 
 void L1Analysis::L1AnalysisRecoMet::SetECALFlags(const edm::ESHandle<EcalChannelStatus> chStatus,
 						 const edm::Handle<EcalRecHitCollection> ebRecHits,
 						 const edm::Handle<EcalRecHitCollection> eeRecHits,
@@ -76,5 +77,5 @@ void L1Analysis::L1AnalysisRecoMet::SetECALFlags(const edm::ESHandle<EcalChannel
 
 }
 
-
+*/
 

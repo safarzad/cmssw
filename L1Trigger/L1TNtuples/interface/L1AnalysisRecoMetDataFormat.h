@@ -52,7 +52,10 @@ namespace L1Analysis
     float mHtPhi;
     float sumEt;
     unsigned short ecalFlag;
+    unsigned short ecalSpikeFlag;
     unsigned short hcalFlag;
+    std::vector<short> sevlT;
+
     
   }; 
 }
