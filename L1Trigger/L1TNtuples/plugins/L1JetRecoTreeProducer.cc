@@ -37,7 +37,9 @@
 #include "DataFormats/METReco/interface/PFMET.h"
 #include "DataFormats/METReco/interface/CaloMETCollection.h"
 #include "DataFormats/METReco/interface/CaloMET.h"
-
+#include "RecoLocalCalo/EcalRecAlgos/interface/EcalSeverityLevelAlgo.h"
+#include "RecoLocalCalo/EcalRecAlgos/interface/EcalSeverityLevelAlgoRcd.h"
+#include "Geometry/CaloTopology/interface/EcalTrigTowerConstituentsMap.h"
 
 // ROOT output stuff
 #include "FWCore/ServiceRegistry/interface/Service.h"
@@ -74,6 +76,7 @@ private:
   void doCaloMetBE(edm::Handle<reco::CaloMETCollection> caloMetBE);
 
   void doPFMet(edm::Handle<reco::PFMETCollection> pfMet);
+  void doECALFlags(edm::Handle<reco::CaloMETCollection> recoMet, edm::ESHandle<EcalChannelStatus> chStatus, edm::Handle<EcalRecHitCollection> ebRecHits, edm::Handle<EcalRecHitCollection> eeRecHits, edm::ESHandle<EcalSeverityLevelAlgo> sevlv);
 
   bool jetID(const reco::PFJet& jet);
   bool caloJetID(const reco::CaloJet& jet);
@@ -101,7 +104,10 @@ private:
   edm::EDGetTokenT<reco::CaloMETCollection>   caloMetToken_;
   edm::EDGetTokenT<reco::CaloMETCollection>   caloMetBEToken_;
 
-  
+  edm::EDGetTokenT<reco::CaloMETCollection>   recoMetToken_;
+  edm::EDGetTokenT<EcalRecHitCollection> ebRecHitToken_;
+  edm::EDGetTokenT<EcalRecHitCollection> eeRecHitToken_;
+
   // debug stuff
   bool pfJetsMissing_;
   double jetptThreshold_;
@@ -118,7 +124,7 @@ private:
   bool pfMetMissing_;
   bool caloMetMissing_;
   bool caloMetBEMissing_;
-
+  bool rechitMissing_;
 };
 
 
@@ -130,7 +136,8 @@ L1JetRecoTreeProducer::L1JetRecoTreeProducer(const edm::ParameterSet& iConfig):
   caloJetIDMissing_(false),
   pfMetMissing_(false),
   caloMetMissing_(false),
-  caloMetBEMissing_(false)
+  caloMetBEMissing_(false),
+  rechitMissing_(false)
 {
   
   caloJetToken_ = consumes<reco::CaloJetCollection>(iConfig.getUntrackedParameter("caloJetToken",edm::InputTag("ak4CaloJets")));
@@ -143,6 +150,10 @@ L1JetRecoTreeProducer::L1JetRecoTreeProducer(const edm::ParameterSet& iConfig):
   caloMetToken_ = consumes<reco::CaloMETCollection>(iConfig.getUntrackedParameter("caloMetToken",edm::InputTag("caloMet")));
   caloMetBEToken_ = consumes<reco::CaloMETCollection>(iConfig.getUntrackedParameter("caloMetBEToken",edm::InputTag("caloMetBE")));
 
+  recoMetToken_ = consumes<reco::CaloMETCollection>(iConfig.getUntrackedParameter("recoMetToken",edm::InputTag("caloMet")));
+  ebRecHitToken_    = consumes<EcalRecHitCollection>(iConfig.getUntrackedParameter("ebRecHitToken",edm::InputTag("reducedEcalRecHitsEB")));
+  eeRecHitToken_    = consumes<EcalRecHitCollection>(iConfig.getUntrackedParameter("eeRecHitToken",edm::InputTag("reducedEcalRecHitsEE")));
+ 
   jetptThreshold_ = iConfig.getParameter<double>      ("jetptThreshold");
   jetetaMax_       = iConfig.getParameter<double>      ("jetetaMax");
   maxJet_         = iConfig.getParameter<unsigned int>("maxJet");
@@ -205,6 +216,23 @@ void L1JetRecoTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSe
 
   edm::Handle<reco::CaloMETCollection> caloMetBE;
   iEvent.getByToken(caloMetBEToken_, caloMetBE);
+
+
+  edm::Handle<reco::CaloMETCollection> recoMet;
+  iEvent.getByToken(recoMetToken_, recoMet);
+
+
+  edm::Handle<EcalRecHitCollection> ebRecHits;
+  iEvent.getByToken(ebRecHitToken_, ebRecHits);
+  edm::Handle<EcalRecHitCollection> eeRecHits;
+  iEvent.getByToken(eeRecHitToken_, eeRecHits);
+
+  edm::ESHandle<EcalSeverityLevelAlgo> sevlv;
+  iSetup.get<EcalSeverityLevelAlgoRcd>().get(sevlv);
+
+   edm::ESHandle<EcalChannelStatus> chStatus;
+   iSetup.get<EcalChannelStatusRcd>().get(chStatus);
+  
 
   if (pfJets.isValid()) {
 
@@ -285,6 +313,14 @@ void L1JetRecoTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSe
     if (!caloMetBEMissing_) {edm::LogWarning("MissingProduct") << "CaloMetBE not found. Branch will not be filled" << std::endl;}
     caloMetBEMissing_ = true;
   }
+
+    if ( sevlv.isValid() ) {
+   doECALFlags(recoMet,chStatus,ebRecHits,eeRecHits, sevlv);
+    }
+   else {
+   if(!rechitMissing_){edm::LogWarning("MissingProduct") << "recoMet not found. Branch will not be filled" << std::endl;}
+	rechitMissing_ = true;
+     }
 
   tree_->Fill();
 
@@ -473,6 +509,50 @@ L1JetRecoTreeProducer::doCaloMetBE(edm::Handle<reco::CaloMETCollection> caloMetB
   met_data->caloMetBE    = theMet.et();
   met_data->caloMetPhiBE = theMet.phi();
   met_data->caloSumEtBE  = theMet.sumEt();
+
+}
+
+
+void 
+L1JetRecoTreeProducer::doECALFlags(edm::Handle<reco::CaloMETCollection> recoMet, edm::ESHandle<EcalChannelStatus> chStatus, edm::Handle<EcalRecHitCollection> ebRecHits, edm::Handle<EcalRecHitCollection> eeRecHits, edm::ESHandle<EcalSeverityLevelAlgo> sevlv){
+
+  const reco::CaloMETCollection *metCol = recoMet.product();
+  const reco::CaloMET theMet = metCol->front();
+
+  
+  int ecalFlag=0;
+
+
+  // loop over EB rechits
+  for(EcalRecHitCollection::const_iterator  rechit = ebRecHits->begin();
+      rechit != ebRecHits->end();
+      ++rechit){
+
+    EBDetId eid(rechit->id());
+  //  EcalRecHit hit = (*rechit);
+    int flag = sevlv->severityLevel( eid, *ebRecHits);
+
+/*
+ A test to check we get the right flag 
+   int rechit_flag_kweird=0;
+   int rechit_flag_kdiweird=0;
+   int rechit_flag_koot=0;
+
+   if (hit.checkFlag(EcalRecHit::kWeird)) rechit_flag_kweird=1;
+   if (hit.checkFlag(EcalRecHit::kDiWeird)) rechit_flag_kdiweird=1;
+   if (hit.checkFlag(EcalRecHit::kOutOfTime)) rechit_flag_koot=1;
+
+  
+ //  if(rechit_flag_kweird !=0 || rechit_flag_kdiweird !=0 || rechit_flag_koot!=0)  std::cout<<"we are here:"<<rechit_flag_koot<<","<<rechit_flag_kweird<<","<<rechit_flag_kdiweird<<std::endl;
+
+*/
+
+
+    if (flag>ecalFlag) ecalFlag = flag;        
+
+  }
+  
+   met_data->ecalFlag = ecalFlag;
 
 }
 
